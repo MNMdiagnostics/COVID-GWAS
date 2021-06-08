@@ -18,15 +18,20 @@ outlier <- function (x) {
 }
 ```
 
+```{r set p treshold, echo=FALSE}
+Pt <- 0.05
+```
+
+
 ```{r sample info, echo=FALSE}
-pheno <- fread('input/plink_data/pheno.txt')
+pheno <- read.table('input/plink_data/pheno.txt',header = T)
 pheno %>% na.omit %>% ggplot(aes(factor(Y1))) + geom_bar(fill=c('#27384A','#48C095'),width=0.5) +
   geom_text(stat='count', aes(label=..count..), vjust=-1) + 
   theme_classic() + 
-  ylim(c(0,900)) + 
+  ylim(c(0,1000)) + 
   ylab('Number of individuals') +
   xlab('Covid severity') +
-  scale_x_discrete(labels=c('Severe + mild','Control')) + 
+  scale_x_discrete(labels=c('Control','Severe')) + 
   ggtitle(paste('Distribution of covid severity in cohort of',pheno %>% 
                   na.omit() %>% nrow(), 'individuals',sep = ' ')) +
   theme(plot.title = element_text(hjust = 0.5))
@@ -52,7 +57,8 @@ cardiac_sig %>%
   geom_smooth(method = 'lm', col = '#27384A', formula = 'y~x',se=F) +
   ylab('Frequency of allele in cases') +
   xlab('Frequency of allele in controls') +
-  ggtitle('Frequency of alleles in cases and controls', subtitle = 'Fisher exact test P value < 0.005') + 
+  ggtitle('Frequency of alleles in cases and controls', 
+          subtitle = paste('Fisher exact test P value <', Pt,sep = ' ')) + 
   theme_classic() +
   theme(plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust=0.5))
   
@@ -61,13 +67,14 @@ cardiac_sig %>%
 
 ```{r OR plot, echo=FALSE}
 cardiac_fish %>% 
-  filter(P < 0.005) %>%
+  filter(P < Pt) %>%
   ggplot(aes(x=OR,y=1)) + 
   geom_violin(fill='#48C095', col='#27384A') +
   geom_boxplot(width=0.1) +
   ylab('') +
   xlab('Odds ratio') +
-  ggtitle('Estimated odds ratio of minor allele', subtitle = 'Fisher exact test P value < 0.005') + 
+  ggtitle('Estimated odds ratio of minor allele', 
+          subtitle = paste('Fisher exact test P value <', Pt,sep = ' ')) + 
   theme_classic() +
   theme(plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust=0.5)) +
   theme(axis.text.y = element_blank())
@@ -76,18 +83,22 @@ cardiac_fish %>%
 
 
 ```{r OR outliers, echo=FALSE}
-or_out <- cardiac_fish %>% filter(P < 0.005) %>% filter(OR %in% outlier(cardiac_fish$OR))
+or_out <- cardiac_fish %>% filter(P < Pt) %>% filter(OR %in% outlier(cardiac_fish$OR))
 
 ```
 
 ```{r, echo =FALSE}
-#vep <- read.csv('input/cardiac_panel.vep',skip = 93,header=T,sep='\t')
-#glimpse(vep)
+vep <- read.csv('input/cardiac_panel.vep',skip = 40,header=T,sep='\t')
+high_impact <- vep %>% select(X.Uploaded_variation,Location,Allele,Gene,IMPACT,Consequence)
+
+high_sig <- cardiac_sig %>% left_join(high_impact, by=c('SNP'='X.Uploaded_variation'))
+
+sig_impact <- high_sig %>% filter(IMPACT=='LOW' | IMPACT=='MODERATE')
+sig_conseq <- high_sig %>% filter(Consequence != 'synonymous_variant' & Consequence != 'intron_variant')
+
+kable(
+  sig_impact %>% select(SNP,Location,Allele,Gene,F_A,F_U,P,OR,IMPACT,Consequence)
+)
 ```
 
-
-```{r vep, echo =FALSE}
-#or_out_vep <- or_out %>% left_join(vep,by = c('SNP' = 'X.Uploaded_variation'))
-
-```
 
