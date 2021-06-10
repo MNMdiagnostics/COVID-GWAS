@@ -1,6 +1,8 @@
 ---
 title: "ensembl_cardiac_diseases_panel_20200715"
-output: github_document
+output: 
+  pdf_document: default
+  keep_md: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -8,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 suppressMessages(library(knitr))
 suppressMessages(library(data.table))
 suppressMessages(library(tidyverse))
+suppressMessages(library(qvalue))
 
 outlier <- function (x) {
   IQR <- quantile(x)[[4]] - quantile(x)[[2]]
@@ -18,33 +21,52 @@ outlier <- function (x) {
 }
 ```
 
-```{r set p treshold, echo=FALSE}
-Pt <- 0.05
-```
-
+## 1. Cohort information
 
 ```{r sample info, echo=FALSE}
-pheno <- read.table('input/plink_data/pheno.txt',header = T)
-pheno %>% na.omit %>% ggplot(aes(factor(Y1))) + geom_bar(fill=c('#27384A','#48C095'),width=0.5) +
+prepheno <- read.table('input/prepheno.csv',header=T,sep='\t')
+to_include <- read.table('../../genom_polaka/SAMPLES_TO_INCLUDE_210519.txt',sep='\t')
+
+pheno <- prepheno %>% filter(prepheno$Individual_ID %in% to_include$V1)
+pheno$Covid_severity <- ifelse(pheno$Covid_severity == 'COV_SEVERE', 1,0) 
+  pheno%>%
+  ggplot(aes(factor(Covid_severity))) + geom_bar(fill=c('#27384A','#48C095'),width=0.5) +
   geom_text(stat='count', aes(label=..count..), vjust=-1) + 
-  theme_classic() + 
   ylim(c(0,1000)) + 
   ylab('Number of individuals') +
   xlab('Covid severity') +
   scale_x_discrete(labels=c('Control','Severe')) + 
-  ggtitle(paste('Distribution of covid severity in cohort of',pheno %>% 
-                  na.omit() %>% nrow(), 'individuals',sep = ' ')) +
+  ggtitle(paste('Distribution of covid severity in cohort of',pheno %>% nrow(), 'individuals',sep = ' ')) +
+  theme_classic() +  
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
+Control label include mild benign and resistant response to COVID-19 infection
+
+
+<!-- ```{r PCA info, echo=FALSE} -->
+<!-- pca <- read.table('output/cardiac.eigenvec') -->
+<!-- pca_pheno <- pheno %>% select(Individual_ID,Covid_severity) %>% left_join(pca,by = c('Individual_ID'='V2')) -->
+
+<!-- ``` -->
+
+\newpage
+## 2. Results
+
+Association study was performed by comparison of allele counts in cases 
+and controls with Chi-square test. Significance of variants is expressed in form of q-values 
+which are FDR adjusted p-values.
 
 
 ```{r af plot, echo=FALSE}
-cardiac_fish <- fread('output/cardiac_panel.assoc.fisher') %>% na.omit()
-cardiac_sig <- cardiac_fish %>%
-  filter(P < 0.005)
+group.colors <- c(significant = "#BC0020", `not significant` ="#48C095")
 
-vep_pos <- cardiac_sig %>% select(CHR,BP)
+cardiac_fish <- fread('output/cardiac.assoc') 
+qobj <- qvalue(p = cardiac_fish$P)
+cardiac_fish$q <- qobj$qvalues
+cardiac_fish$significance <- ifelse(cardiac_fish$q < 0.1,'significant','not significant') 
+
+vep_pos <- cardiac_fish %>% select(CHR,BP)
 vep_pos$POS <- paste('chr',vep_pos$CHR,sep='')
 vep_pos$POS <- paste(vep_pos$POS, vep_pos$BP,sep=':')
 write.table(vep_pos$POS,'input/cardiac_pos.tsv',quote = F,
@@ -52,53 +74,62 @@ write.table(vep_pos$POS,'input/cardiac_pos.tsv',quote = F,
              row.names = F,
              sep='\t')
 
-cardiac_sig %>%
-  ggplot(aes(x=F_U,y=F_A)) + geom_point(col='#48C095') +
-  geom_smooth(method = 'lm', col = '#27384A', formula = 'y~x',se=F) +
+cardiac_fish %>% na.omit() %>%
+  ggplot(aes(x=F_U,y=F_A,col=significance)) + 
+  geom_point(alpha=0.5) +
   ylab('Frequency of allele in cases') +
   xlab('Frequency of allele in controls') +
-  ggtitle('Frequency of alleles in cases and controls', 
-          subtitle = paste('Fisher exact test P value <', Pt,sep = ' ')) + 
+  ggtitle('Minor allele frequency in cases and controls') + 
   theme_classic() +
-  theme(plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust=0.5))
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust=0.5)) +
+  scale_color_manual(values=group.colors)
   
 
 ```
 
-```{r OR plot, echo=FALSE}
-cardiac_fish %>% 
-  filter(P < Pt) %>%
-  ggplot(aes(x=OR,y=1)) + 
-  geom_violin(fill='#48C095', col='#27384A') +
-  geom_boxplot(width=0.1) +
-  ylab('') +
-  xlab('Odds ratio') +
-  ggtitle('Estimated odds ratio of minor allele', 
-          subtitle = paste('Fisher exact test P value <', Pt,sep = ' ')) + 
-  theme_classic() +
-  theme(plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust=0.5)) +
-  theme(axis.text.y = element_blank())
-  
-```
 
 
-```{r OR outliers, echo=FALSE}
-or_out <- cardiac_fish %>% filter(P < Pt) %>% filter(OR %in% outlier(cardiac_fish$OR))
 
-```
 
 ```{r, echo =FALSE}
-vep <- read.csv('input/cardiac_panel.vep',skip = 40,header=T,sep='\t')
-high_impact <- vep %>% select(X.Uploaded_variation,Location,Allele,Gene,IMPACT,Consequence)
+vep <- read.csv('input/cardiac_panel.vep.tsv',header=T,sep='\t')
+vep_cardiac <- cardiac_fish %>% filter(significance=='significant') %>%
+  select(SNP) %>% left_join(vep, by = c('SNP'='X.Uploaded_variation')) %>%
+  right_join(cardiac_fish, by = 'SNP')  %>%
+  select(SNP,Existing_variation,SYMBOL,Consequence,IMPACT, CLIN_SIG, q,F_A,F_U,OR) %>% 
+  na.omit() %>% rename('qvalue' = q, 'case_frequency' = F_A, 'ctrl_frequency'=F_U, 
+                       'minor_allele_OR' = OR) %>% arrange(qvalue)
+```
 
-high_sig <- cardiac_sig %>% left_join(high_impact, by=c('SNP'='X.Uploaded_variation'))
 
-sig_impact <- high_sig %>% filter(IMPACT=='LOW' | IMPACT=='MODERATE')
-sig_conseq <- high_sig %>% filter(Consequence != 'synonymous_variant' & Consequence != 'intron_variant')
+\newpage
+```{r, echo=FALSE}
+kable(vep_cardiac %>% select(-SNP,-CLIN_SIG) %>%
+        rename('rsid'=Existing_variation) %>% select(-Consequence,-IMPACT),
+      caption = "Variants with q-value < 0.1"
+        )
 
-kable(
-  sig_impact %>% select(SNP,Location,Allele,Gene,F_A,F_U,P,OR,IMPACT,Consequence)
-)
+```
+
+
+
+```{r OR plot, echo=FALSE}
+cardiac_fish %>% filter(significance == 'significant') %>% 
+  left_join(vep_cardiac, by = 'SNP') %>% na.omit() %>%
+  ggplot(aes(y=Existing_variation,x=minor_allele_OR)) + 
+  geom_point(col="#48C095") +
+  xlim(c(0,30)) +
+  geom_text(aes(label=SYMBOL),hjust=-0.2, vjust=0.2) +
+  geom_vline(xintercept = 1,linetype='dashed',col="#BC0020") +
+  ylab('rsid') +
+  xlab('Odds ratio') +
+  ggtitle('Estimated odds ratio of minor allele occurence') + 
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust=0.5))
+ 
+
 ```
 
 
