@@ -1,8 +1,9 @@
 ---
 title: "OAS_panel"
+subtitle: 'Results on cohort of 943 unrelated individuals'
 output: 
-  github_document: default
   pdf_document: default
+  github_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -43,13 +44,6 @@ pheno$Covid_severity <- ifelse(pheno$Covid_severity == 'COV_SEVERE', 1,0)
 
 Control label include mild benign and resistant response to COVID-19 infection
 
-
-<!-- ```{r PCA info, echo=FALSE} -->
-<!-- pca <- read.table('output/cardiac.eigenvec') -->
-<!-- pca_pheno <- pheno %>% select(Individual_ID,Covid_severity) %>% left_join(pca,by = c('Individual_ID'='V2')) -->
-
-<!-- ``` -->
-
 \newpage
 ## 2. Results
 
@@ -61,7 +55,7 @@ which are FDR adjusted p-values.
 ```{r af plot, echo=FALSE}
 group.colors <- c(significant = "#BC0020", `not significant` ="#48C095")
 
-cardiac_fish <- fread('../output/OAS.assoc')  %>% distinct()
+cardiac_fish <- fread('../output/OAS.assoc') 
 qobj <- qvalue(p = cardiac_fish$P)
 cardiac_fish$q <- qobj$qvalues
 cardiac_fish$significance <- ifelse(cardiac_fish$q < 0.32 ,'significant','not significant') 
@@ -94,14 +88,19 @@ cardiac_fish %>% na.omit() %>%
 
 ```{r, echo =FALSE}
 vep <- read.csv('../input/oas.vep.tsv',header=T,sep='\t')
-vep_cardiac <- cardiac_fish %>% filter(significance=='significant') %>%
-  select(SNP) %>% left_join(vep, by = c('SNP'='Uploaded_variation')) %>%
-  right_join(cardiac_fish, by = 'SNP')  %>%
-  select(SNP,Existing_variation,SYMBOL,Consequence,IMPACT, CLIN_SIG, q,F_A,F_U,OR) %>% 
-  rename('qvalue' = q, 'case_frequency' = F_A, 'ctrl_frequency'=F_U, 
-                       'minor_allele_OR' = OR) %>% 
-  filter(grepl("rs",Existing_variation)) %>%
-  arrange(desc(case_frequency))  
+# vep_cardiac <- cardiac_fish %>% filter(significance=='significant') %>%
+#   select(SNP) %>% left_join(vep, by = c('SNP'='Uploaded_variation')) %>%
+#   right_join(cardiac_fish, by = 'SNP')  %>%
+#   select(SNP,Existing_variation,SYMBOL,Consequence,IMPACT, CLIN_SIG, q,F_A,F_U,OR) %>% 
+#   rename('qvalue' = q, 'case_frequency' = F_A, 'ctrl_frequency'=F_U, 
+#                        'minor_allele_OR' = OR) %>% 
+#   filter(grepl("rs",Existing_variation)) %>%
+#   arrange(desc(case_frequency))  
+
+vep_cardiac <- cardiac_fish %>%
+  left_join(vep, by = c('SNP'='Uploaded_variation')) %>%
+  filter(grepl("rs",Existing_variation),significance == 'significant') %>%
+  distinct()
 
 write.table(vep_cardiac,'../output/OAS_variants.tsv',sep='\t',col.names = T,row.names = F,quote = F)
 
@@ -111,10 +110,11 @@ write.table(vep_cardiac,'../output/OAS_variants.tsv',sep='\t',col.names = T,row.
 
 
 ```{r OR plot, echo=FALSE}
-cardiac_fish %>% filter(significance == 'significant') %>%
-  left_join(vep_cardiac, by = 'SNP') %>%  
-  filter(is.na(minor_allele_OR) == F & is.na(Existing_variation) == F) %>%
-  ggplot(aes(y=Existing_variation,x=minor_allele_OR)) +
+orplot <- vep_cardiac %>%
+  filter(is.na(OR) == F & is.na(Existing_variation) == F) %>% distinct()
+
+orplot %>%
+  ggplot(aes(y=reorder(Existing_variation,-OR), x=OR)) +
   geom_point(col="#48C095") +
   geom_text(aes(label=SYMBOL),hjust=-0.2, vjust=0.2) +
   geom_vline(xintercept = 1,linetype='dashed',col="#BC0020") +
@@ -133,8 +133,12 @@ cardiac_fish %>% filter(significance == 'significant') %>%
 \newpage
 
 ```{r, echo=FALSE}
-kable(vep_cardiac %>% select(-SNP,-CLIN_SIG,-Consequence) %>%
-        rename('rsid'=Existing_variation, 'OR'=minor_allele_OR),
+kable(vep_cardiac %>% 
+        select(Existing_variation,SYMBOL,IMPACT,q,
+               F_A,F_U,OR) %>%
+        rename('rsid'=Existing_variation,'qvalue' = q, 
+               'case_frequency' = F_A, 'ctrl_frequency'=F_U, 'minor_allele_OR' = OR) %>%
+        arrange(desc(minor_allele_OR)),
         caption = "Variants with q-value < 0.32"
         )
 

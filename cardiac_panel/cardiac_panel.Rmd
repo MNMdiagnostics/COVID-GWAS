@@ -1,8 +1,8 @@
 ---
 title: "ensembl_cardiac_diseases_panel_20200715"
 output: 
-  github_document: default
   pdf_document: default
+  github_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -24,8 +24,8 @@ outlier <- function (x) {
 ## 1. Cohort information
 
 ```{r sample info, echo=FALSE}
-prepheno <- read.table('input/prepheno.csv',header=T,sep='\t')
-to_include <- read.table('../../genom_polaka/SAMPLES_TO_INCLUDE_210519.txt',sep='\t')
+prepheno <- read.table('../input/prepheno.csv',header=T,sep='\t')
+to_include <- read.table('../../../genom_polaka/SAMPLES_TO_INCLUDE_210519.txt',sep='\t')
 
 pheno <- prepheno %>% filter(prepheno$Individual_ID %in% to_include$V1)
 pheno$Covid_severity <- ifelse(pheno$Covid_severity == 'COV_SEVERE', 1,0) 
@@ -43,13 +43,6 @@ pheno$Covid_severity <- ifelse(pheno$Covid_severity == 'COV_SEVERE', 1,0)
 
 Control label include mild benign and resistant response to COVID-19 infection
 
-
-<!-- ```{r PCA info, echo=FALSE} -->
-<!-- pca <- read.table('output/cardiac.eigenvec') -->
-<!-- pca_pheno <- pheno %>% select(Individual_ID,Covid_severity) %>% left_join(pca,by = c('Individual_ID'='V2')) -->
-
-<!-- ``` -->
-
 \newpage
 ## 2. Results
 
@@ -61,7 +54,7 @@ which are FDR adjusted p-values.
 ```{r af plot, echo=FALSE}
 group.colors <- c(significant = "#BC0020", `not significant` ="#48C095")
 
-cardiac_fish <- fread('output/cardiac.assoc') 
+cardiac_fish <- fread('../output/CARDIAC.assoc') 
 qobj <- qvalue(p = cardiac_fish$P)
 cardiac_fish$q <- qobj$qvalues
 cardiac_fish$significance <- ifelse(cardiac_fish$q < 0.1,'significant','not significant') 
@@ -69,7 +62,7 @@ cardiac_fish$significance <- ifelse(cardiac_fish$q < 0.1,'significant','not sign
 vep_pos <- cardiac_fish %>% select(CHR,BP)
 vep_pos$POS <- paste('chr',vep_pos$CHR,sep='')
 vep_pos$POS <- paste(vep_pos$POS, vep_pos$BP,sep=':')
-write.table(vep_pos$POS,'input/cardiac_pos.tsv',quote = F,
+write.table(vep_pos$POS,'../input/cardiac_pos.tsv',quote = F,
              col.names = F,
              row.names = F,
              sep='\t')
@@ -93,7 +86,7 @@ cardiac_fish %>% na.omit() %>%
 
 
 ```{r, echo =FALSE}
-vep <- read.csv('input/cardiac_panel.vep.tsv',header=T,sep='\t')
+vep <- read.csv('../input/cardiac_panel.vep.tsv',header=T,sep='\t')
 vep_cardiac <- cardiac_fish %>% filter(significance=='significant') %>%
   select(SNP) %>% left_join(vep, by = c('SNP'='X.Uploaded_variation')) %>%
   right_join(cardiac_fish, by = 'SNP')  %>%
@@ -104,20 +97,11 @@ vep_cardiac <- cardiac_fish %>% filter(significance=='significant') %>%
 
 
 \newpage
-```{r, echo=FALSE}
-kable(vep_cardiac %>% select(-SNP,-CLIN_SIG) %>%
-        rename('rsid'=Existing_variation) %>% select(-Consequence,-IMPACT),
-      caption = "Variants with q-value < 0.1"
-        )
-
-```
-
-
 
 ```{r OR plot, echo=FALSE}
 cardiac_fish %>% filter(significance == 'significant') %>% 
   left_join(vep_cardiac, by = 'SNP') %>% na.omit() %>%
-  ggplot(aes(y=Existing_variation,x=minor_allele_OR)) + 
+  ggplot(aes(y=reorder(Existing_variation,-minor_allele_OR),x=minor_allele_OR)) + 
   geom_point(col="#48C095") +
   xlim(c(0,30)) +
   geom_text(aes(label=SYMBOL),hjust=-0.2, vjust=0.2) +
@@ -134,3 +118,13 @@ cardiac_fish %>% filter(significance == 'significant') %>%
 ```
 
 
+```{r, echo=FALSE}
+kable(vep_cardiac %>% select(-SNP,-CLIN_SIG) %>%
+        rename('rsid'=Existing_variation) %>% 
+        select(rsid,SYMBOL,IMPACT,qvalue,
+               case_frequency,ctrl_frequency,minor_allele_OR) %>%
+        arrange(desc(minor_allele_OR)),
+      caption = "Variants with q-value < 0.1"
+        )
+
+```
