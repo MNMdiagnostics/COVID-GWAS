@@ -58,7 +58,7 @@ cardiac_fish <- fread('../output/CARDIAC.assoc')
 qobj <- qvalue(p = cardiac_fish$P)
 cardiac_fish$q <- qobj$qvalues
 cardiac_fish$significance <- ifelse(cardiac_fish$q < 0.1,'significant','not significant') 
-cardiac_fish <- cardiac_fish %>% arrange(q)
+cardiac_fish <- cardiac_fish %>% arrange(q) %>% distinct()
 
 vep_pos <- cardiac_fish %>% select(CHR,BP)
 vep_pos$POS <- paste('chr',vep_pos$CHR,sep='')
@@ -69,11 +69,11 @@ write.table(vep_pos$POS,'../input/cardiac_pos.tsv',quote = F,
              sep='\t')
 
 cardiac_fish %>% na.omit() %>%
-  ggplot(aes(x=F_U,y=F_A,col=significance)) + 
+  ggplot(aes(x=C_U,y=C_A,col=significance)) + 
   geom_point(alpha=0.5) +
-  ylab('Frequency of allele in cases') +
-  xlab('Frequency of allele in controls') +
-  ggtitle('Minor allele frequency in cases and controls') + 
+  ylab('Count of allele in cases') +
+  xlab('Count of allele in controls') +
+  ggtitle('Minor allele count in cases and controls') + 
   theme_classic() +
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust=0.5)) +
@@ -82,6 +82,29 @@ cardiac_fish %>% na.omit() %>%
 
 ```
 
+\newpage
+
+### Manhattan plot 
+Red points are SNPs with qvalue < 0.1
+
+```{r q_manhattan_plot, echo=F}
+cardiac_fish$chr_col <- NA
+cardiac_fish$chr_col <- ifelse(cardiac_fish$CHR %% 2 == 0, 'even','odd')
+cardiac_fish$chr_col <- ifelse(cardiac_fish$q < 0.1, 's',cardiac_fish$chr_col)
+
+chr.group <- c(even = '#27384A',odd = '#48C095',s='#BC0020')
+
+cardiac_fish %>% 
+  filter(is.na(P) == F) %>%
+  ggplot(aes(x=CHR,y=-log10(P))) +
+  geom_jitter(aes(col=chr_col)) +
+  scale_color_manual(values = chr.group) +
+  theme_classic() +
+  theme(legend.position = 'none') +
+  scale_x_continuous(labels = c(1:22,'X'),breaks = 1:23) +
+  xlab('Chromosomes')
+
+```
 
 
 
@@ -91,9 +114,9 @@ vep <- read.csv('../input/cardiac_panel.vep.tsv',header=T,sep='\t')
 vep_cardiac <- cardiac_fish %>% filter(significance=='significant') %>%
   select(SNP) %>% left_join(vep, by = c('SNP'='X.Uploaded_variation')) %>%
   right_join(cardiac_fish, by = 'SNP')  %>%
-  select(SNP,Existing_variation,SYMBOL,A1,A2, CLIN_SIG, q,P,F_A,F_U,OR,L95,U95,significance) %>% 
+  select(SNP,Existing_variation,SYMBOL,A1,A2, CLIN_SIG, q,P,C_A,C_U,OR,L95,U95,significance) %>% 
   na.omit() %>% 
-  rename('qvalue' = q, 'case_frequency' = F_A, 'ctrl_frequency'=F_U) %>% 
+  rename('qvalue' = q, 'case_count' = C_A, 'ctrl_count'=C_U) %>% 
   arrange(qvalue)
 ```
 
@@ -122,9 +145,8 @@ vep_cardiac %>% filter(significance == 'significant') %>%
 
 ```{r, echo=FALSE}
 kable(vep_cardiac %>%
-        #rename('rsid'=Existing_variation) %>% 
         select(SNP,SYMBOL,
-               A2,A1,case_frequency,ctrl_frequency,qvalue,OR) %>%
+               A2,A1,case_count,ctrl_count,qvalue,OR) %>%
         arrange(qvalue),
       caption = "Variants with q-value < 0.1"
         )

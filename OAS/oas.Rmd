@@ -55,12 +55,12 @@ which are FDR adjusted p-values.
 ```{r af plot, echo=FALSE}
 group.colors <- c(significant = "#BC0020", `not significant` ="#48C095")
 
-cardiac_fish <- fread('../output/OAS.assoc') 
-qobj <- qvalue(p = cardiac_fish$P)
-cardiac_fish$q <- qobj$qvalues
-cardiac_fish$significance <- ifelse(cardiac_fish$q < 0.32 ,'significant','not significant') 
+oas_fish <- fread('../output/OAS.assoc')  %>% distinct()
+qobj <- qvalue(p = oas_fish$P)
+oas_fish <- oas_fish %>% mutate(q = qobj$qvalues) %>% arrange(q) 
+oas_fish$significance <- ifelse(oas_fish$q < 0.32 ,'significant','not significant') 
 
-vep_pos <- cardiac_fish %>% select(CHR,BP)
+vep_pos <- oas_fish %>% select(CHR,BP)
 vep_pos$POS <- paste('chr',vep_pos$CHR,sep='')
 vep_pos$POS <- paste(vep_pos$POS, vep_pos$BP,sep=':')
 write.table(vep_pos$POS,'../input/oas_pos.tsv',quote = F,
@@ -68,12 +68,12 @@ write.table(vep_pos$POS,'../input/oas_pos.tsv',quote = F,
              row.names = F,
              sep='\t')
 
-cardiac_fish %>% na.omit() %>%
-  ggplot(aes(x=F_U,y=F_A,col=significance)) +
-  geom_point(alpha=0.5) +
-  ylab('Frequency of allele in cases') +
-  xlab('Frequency of allele in controls') +
-  ggtitle('Minor allele frequency in cases and controls') +
+oas_fish %>% na.omit() %>%
+  ggplot(aes(x=C_U,y=C_A,col=significance)) +
+  geom_point() +
+  ylab('Counts of allele in cases') +
+  xlab('Counts of allele in controls') +
+  ggtitle('Minor allele count in cases and controls') +
   theme_classic() +
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust=0.5)) +
@@ -82,43 +82,58 @@ cardiac_fish %>% na.omit() %>%
 
 ```
 
+### Manhattan plot 
+Red points are SNPs with qvalue < 0.32
+
+```{r q_manhattan_plot, echo=F}
+oas_fish$chr_col <- 'chr'
+#oas_fish$chr_col <- ifelse(oas_fish$CHR %% 2 == 0, 'even','odd')
+oas_fish$chr_col <- ifelse(oas_fish$q < 0.32, 's',oas_fish$chr_col)
+
+chr.group <- c(chr = '#48C095',s='#BC0020')
+
+oas_fish %>% 
+  filter(is.na(P) == F) %>%
+  ggplot(aes(x=BP/1e+06,y=-log10(P))) +
+  geom_jitter(aes(col=chr_col)) +
+  scale_color_manual(values = chr.group) +
+  theme_classic() +
+  theme(legend.position = 'none') +
+  xlab('Position (mbp)')
+
+```
 
 
 
 
 ```{r, echo =FALSE}
 vep <- read.csv('../input/oas.vep.tsv',header=T,sep='\t')
-# vep_cardiac <- cardiac_fish %>% filter(significance=='significant') %>%
-#   select(SNP) %>% left_join(vep, by = c('SNP'='Uploaded_variation')) %>%
-#   right_join(cardiac_fish, by = 'SNP')  %>%
-#   select(SNP,Existing_variation,SYMBOL,Consequence,IMPACT, CLIN_SIG, q,F_A,F_U,OR) %>% 
-#   rename('qvalue' = q, 'case_frequency' = F_A, 'ctrl_frequency'=F_U, 
-#                        'minor_allele_OR' = OR) %>% 
-#   filter(grepl("rs",Existing_variation)) %>%
-#   arrange(desc(case_frequency))  
 
-vep_cardiac <- cardiac_fish %>%
-  left_join(vep, by = c('SNP'='Uploaded_variation')) %>%
-  filter(grepl("rs",Existing_variation),significance == 'significant') %>%
-  distinct()
+vep_oas <- oas_fish %>%
+  filter(significance=='significant') %>%
+  select(SNP) %>% left_join(vep, by = c('SNP'='Uploaded_variation')) %>%
+  right_join(oas_fish, by = 'SNP')  %>%
+  filter(is.na(SYMBOL) == F) %>%
+  select(SNP,Existing_variation,SYMBOL,A1,A2, CLIN_SIG, q,P,C_A,C_U,OR,L95,U95,significance) %>% 
+  rename('qvalue' = q, 'case_count' = C_A, 'ctrl_count'=C_U) %>% 
+  arrange(qvalue)
 
-write.table(vep_cardiac,'../output/OAS_variants.tsv',sep='\t',col.names = T,row.names = F,quote = F)
-
+write.table(vep_oas,'../output/OAS_variants.tsv',sep='\t',col.names = T,row.names = F,quote = F)
 
 ```
 
 
 
 ```{r OR plot, echo=FALSE}
-orplot <- vep_cardiac %>%
+orplot <- vep_oas %>%
   filter(is.na(OR) == F & is.na(Existing_variation) == F) %>% distinct()
 
 orplot %>%
-  ggplot(aes(y=reorder(Existing_variation,-OR), x=OR)) +
+  ggplot(aes(y=reorder(SNP,-OR), x=OR)) +
   geom_point(col="#48C095") +
   geom_text(aes(label=SYMBOL),hjust=-0.2, vjust=0.2) +
   geom_vline(xintercept = 1,linetype='dashed',col="#BC0020") +
-  ylab('rsid') +
+  ylab('SNP') +
   xlab('Odds ratio') +
   xlim(c(0,10)) +
   ggtitle('Estimated odds ratio (OR) of minor allele occurence',
@@ -133,12 +148,10 @@ orplot %>%
 \newpage
 
 ```{r, echo=FALSE}
-kable(vep_cardiac %>% 
-        select(Existing_variation,SYMBOL,IMPACT,q,
-               F_A,F_U,OR) %>%
-        rename('rsid'=Existing_variation,'qvalue' = q, 
-               'case_frequency' = F_A, 'ctrl_frequency'=F_U, 'minor_allele_OR' = OR) %>%
-        arrange(desc(minor_allele_OR)),
+kable(vep_oas %>% 
+        select(SNP,SYMBOL,
+               A2,A1,case_count,ctrl_count,qvalue,OR) %>%
+        arrange(qvalue),
         caption = "Variants with q-value < 0.32"
         )
 
