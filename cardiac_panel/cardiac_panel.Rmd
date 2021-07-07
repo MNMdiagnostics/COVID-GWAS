@@ -58,6 +58,7 @@ cardiac_fish <- fread('../output/CARDIAC.assoc')
 qobj <- qvalue(p = cardiac_fish$P)
 cardiac_fish$q <- qobj$qvalues
 cardiac_fish$significance <- ifelse(cardiac_fish$q < 0.1,'significant','not significant') 
+cardiac_fish <- cardiac_fish %>% arrange(q)
 
 vep_pos <- cardiac_fish %>% select(CHR,BP)
 vep_pos$POS <- paste('chr',vep_pos$CHR,sep='')
@@ -90,23 +91,24 @@ vep <- read.csv('../input/cardiac_panel.vep.tsv',header=T,sep='\t')
 vep_cardiac <- cardiac_fish %>% filter(significance=='significant') %>%
   select(SNP) %>% left_join(vep, by = c('SNP'='X.Uploaded_variation')) %>%
   right_join(cardiac_fish, by = 'SNP')  %>%
-  select(SNP,Existing_variation,SYMBOL,Consequence,IMPACT, CLIN_SIG, q,F_A,F_U,OR) %>% 
-  na.omit() %>% rename('qvalue' = q, 'case_frequency' = F_A, 'ctrl_frequency'=F_U, 
-                       'minor_allele_OR' = OR) %>% arrange(qvalue)
+  select(SNP,Existing_variation,SYMBOL,A1,A2, CLIN_SIG, q,P,F_A,F_U,OR,L95,U95,significance) %>% 
+  na.omit() %>% 
+  rename('qvalue' = q, 'case_frequency' = F_A, 'ctrl_frequency'=F_U) %>% 
+  arrange(qvalue)
 ```
 
 
 \newpage
 
 ```{r OR plot, echo=FALSE}
-cardiac_fish %>% filter(significance == 'significant') %>% 
-  left_join(vep_cardiac, by = 'SNP') %>% na.omit() %>%
-  ggplot(aes(y=reorder(Existing_variation,-minor_allele_OR),x=minor_allele_OR)) + 
+vep_cardiac %>% filter(significance == 'significant') %>% 
+  #left_join(vep_cardiac, by = 'SNP') %>% na.omit() %>%
+  ggplot(aes(y=reorder(SNP,-OR),x=OR)) + 
   geom_point(col="#48C095") +
   xlim(c(0,30)) +
   geom_text(aes(label=SYMBOL),hjust=-0.2, vjust=0.2) +
   geom_vline(xintercept = 1,linetype='dashed',col="#BC0020") +
-  ylab('rsid') +
+  ylab('SNP') +
   xlab('Odds ratio') +
   ggtitle('Estimated odds ratio (OR) of minor allele occurence', 
           subtitle = 'Red dashed line: OR = 1.0') +
@@ -119,11 +121,11 @@ cardiac_fish %>% filter(significance == 'significant') %>%
 
 
 ```{r, echo=FALSE}
-kable(vep_cardiac %>% select(-SNP,-CLIN_SIG) %>%
-        rename('rsid'=Existing_variation) %>% 
-        select(rsid,SYMBOL,IMPACT,qvalue,
-               case_frequency,ctrl_frequency,minor_allele_OR) %>%
-        arrange(desc(minor_allele_OR)),
+kable(vep_cardiac %>%
+        #rename('rsid'=Existing_variation) %>% 
+        select(SNP,SYMBOL,
+               A2,A1,case_frequency,ctrl_frequency,qvalue,OR) %>%
+        arrange(qvalue),
       caption = "Variants with q-value < 0.1"
         )
 
