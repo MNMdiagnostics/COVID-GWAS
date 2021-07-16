@@ -1,0 +1,12 @@
+plink \
+  --all-pheno \
+  --allow-no-sex \
+  --const-fid 0 \
+  --maf 0.01 \
+  --make-bed \
+  --out ../input/plink_data/common_variants/multisample_20210519 \
+  --pheno ../input/plink_data/pheno_severe_resist.txt \
+  --vcf ../input/multisample_20210519.dv.bcfnorm.filtered.vcf.gz \
+  --vcf-half-call r \
+  --snps-only \
+  --autosome
