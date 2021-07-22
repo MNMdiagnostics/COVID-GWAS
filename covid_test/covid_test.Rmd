@@ -1,0 +1,88 @@
+---
+title: "COVID test"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(knitr))
+```
+
+
+### Analysis conducted with Fisher's exact test with Lancaster's mid-p adjustment
+
+```{r read tests input, echo=F}
+two_tests <- read.table('../output/covid_test/covid_test.assoc.fisher',header=T) %>%
+  arrange(P) %>%
+  mutate(P = format(P, scientific=F), across(where(is.numeric),round, 2)) %>%
+  rename(F_cases = F_A, F_controls = F_U) %>%
+  relocate(SNP, .before = CHR) %>%
+  relocate(A2,.before = A1)
+  
+
+
+all_tests <- read.table('../output/covid_test/covid_test_all_UK.assoc.fisher',header=T) %>%
+  arrange(P) %>%
+  mutate(P = format(P, scientific=F), across(where(is.numeric),round, 2)) %>%
+  rename(F_cases = F_A, F_controls = F_U) %>%
+  relocate(SNP, .before = CHR) %>%
+  relocate(A2,.before = A1)
+
+```
+
+
+### 1. Results for COVID test SNPs
+
+```{r two_tests_table, echo=F}
+kable(two_tests)
+```
+
+
+
+```{r OR_plot_two_tests, echo=FALSE}
+two_tests %>%
+  ggplot(aes(y=reorder(SNP,-OR),x=OR)) + 
+  geom_point(col="#48C095",size=5) +
+  geom_vline(xintercept = 1,linetype='dashed',col="#BC0020") +
+  ylab('SNP') +
+  xlab('Odds ratio') +
+  ggtitle('Estimated odds ratio (OR) of minor allele occurence', 
+          subtitle = 'Red dashed line: OR = 1.0\n Error bars = 95% confidence interval') +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust=0.5)) +
+  geom_errorbar(aes(xmin=L95, xmax=U95), width=.1,
+                 position=position_dodge(.9)) +
+  xlim(c(0,3)) +
+  geom_text(label=paste('pvalue:',two_tests$P), vjust=-2, size=3)
+ 
+```
+
+### 2. Results for lead variants from independent genome-wide significant regions in study: https://www.nature.com/articles/s41586-020-03065-y
+ 
+
+```{r all_tests_table, echo=F}
+kable(all_tests)
+```
+
+```{r OR_plot_all_tests, echo=FALSE}
+all_tests_plot <- all_tests %>%
+  filter(P < 0.5) 
+all_tests_plot %>%
+  ggplot(aes(y=reorder(SNP,-OR),x=OR)) + 
+  geom_point(col="#48C095",size=5) +
+  geom_vline(xintercept = 1,linetype='dashed',col="#BC0020") +
+  ylab('SNP') +
+  xlab('Odds ratio') +
+  ggtitle('Estimated odds ratio (OR) of minor allele occurence', 
+          subtitle = 'Red dashed line: OR = 1.0\n Error bars = 95% confidence interval') +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust=0.5)) +
+  geom_errorbar(aes(xmin=L95, xmax=U95), width=.1,
+                 position=position_dodge(.9)) +
+  xlim(c(0,3)) +
+  geom_text(label=paste('pvalue:',all_tests_plot$P), vjust=-2, size=3)
+ 
+```
