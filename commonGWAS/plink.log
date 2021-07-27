@@ -1,0 +1,12 @@
+PLINK v1.90b6.21 64-bit (19 Oct 2020)
+Options in effect:
+  --all-pheno
+
+Hostname: 2473272a7fda
+Working directory: /root/COVID-GWAS/commonGWAS
+Start time: Tue Jul 20 10:06:26 2021
+
+Error: --all-pheno must be used with --pheno.
+For more information, try "plink --help <flag name>" or "plink --help | more".
+
+End time: Tue Jul 20 10:06:26 2021

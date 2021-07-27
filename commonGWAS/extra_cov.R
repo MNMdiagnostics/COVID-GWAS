@@ -1,26 +1,26 @@
 library(tidyverse)
+new_age <- read.table('new_age.csv',header=T,sep=',') 
+ped <- read.table('input/ped.csv',header=T,sep=',') %>% arrange(Individual_ID) %>%
+  select(-Age) %>% left_join(new_age)
 
-ped <- read.table('input/plink_data/ped_data.csv',header=T,sep=',')
-id_to_include <- read.table('../../genom_polaka/SAMPLES_TO_INCLUDE_210519.txt',
+id_to_include <- read.table('../../genom_polaka/SAMPLES_TO_INCLUDE_210716.txt',
                             col.names = 'IID')
 
-pheno <- ped %>% 
-  filter(Polish_Genome_included == 1 & Individual_ID %in% id_to_include$IID) %>%
-  mutate(Family_ID = 0)
+covars <- ped %>% select(Family_ID,Individual_ID,Sex,Age) %>%
+  filter(Individual_ID %in% id_to_include$IID) %>%
+  mutate(Age_centered = Age - mean(Age, na.rm=T), Family_ID = 0) %>%
+  relocate(Family_ID, .before = Individual_ID) %>%
+  rename(FID = Family_ID, IID = Individual_ID)
 
-covar <- pheno %>% select(Family_ID,Individual_ID,Sex) %>%
-  mutate(Sex = ifelse(Sex == 1,'M','F'))
+covars %>% select(-Age) %>%
+  write.table('input/plink_data/covars.txt',col.names = T,row.names = F,
+            sep='\t',quote=F)
 
-covar %>% write.table('input/GCTA/sex.covar',sep='\t', row.names = F,
-                      col.names = T,quote = F)
+# fam <- read.table('input/plink_data/multisample_20210716.dv.bcfnorm.filt.unrelated.vcf.gz.fam')
+# 
+# pedfam <- covars %>% select(IID,Sex) %>% rename(V2 = IID,V5 = Sex)
+# fam <- fam %>% select(-V5) %>% left_join(pedfam) %>% relocate(V5, .before = V6)
+# write.table(fam, 'input/plink_data/multisample_20210716.dv.bcfnorm.filt.unrelated.vcf.gz.fam',
+#             col.names = F,row.names = F,quote = F,sep='\t')
 
-extra_covars <- read.table('commonGWAS/extra_cov.tsv',header=T) %>%
-  mutate(BMI = w/((h/100)^2)) %>% select(Individual_ID,BMI)
-
-
-covar <- pheno %>% select(Family_ID,Individual_ID,Age) %>% 
-  left_join(extra_covars) %>% select(-BMI)
-
-covar %>% write.table('input/GCTA/age.qcovar',sep='\t', row.names = F,
-                      col.names = T,quote = F)
 

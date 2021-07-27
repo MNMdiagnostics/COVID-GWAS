@@ -1,0 +1,107 @@
+---
+title: "ensembl_cardiac_diseases_panel_20200715"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressMessages(library(knitr))
+suppressMessages(library(data.table))
+suppressMessages(library(tidyverse))
+suppressMessages(library(qvalue))
+
+outlier <- function (x) {
+  IQR <- quantile(x)[[4]] - quantile(x)[[2]]
+  low <- quantile(x)[[2]] - 1.5*IQR
+  high <- quantile(x)[[4]] + 1.5*IQR
+  out_val <- x[x < low | x > high]
+  return(out_val)
+}
+```
+
+
+### 1. Common variants
+
+8045 variants with MAF > 0.01 and LD pruning (indep-pairwise 50 5 0.05)
+
+```{r loading_data, echo=F}
+severe <- fread('../output/common_variants/multisample_20210716.dv.bcfnorm.filt.unrelated.vcf.gz.filtered.severe.assoc.logistic')
+severe <- severe %>% 
+  mutate(q = qvalue(P)$qvalue) %>% 
+  na.omit() %>%
+  arrange(q)
+
+resistance <- fread('../output/common_variants/multisample_20210716.dv.bcfnorm.filt.unrelated.vcf.gz.filtered.resistance.assoc.logistic')
+resistance <- resistance %>% 
+  mutate(q = qvalue(P)$qvalue) %>% 
+  na.omit() %>%
+  arrange(q)
+```
+
+
+```{r severe_q_manhattan_plot, echo=F}
+severe$chr_col <- NA
+severe$chr_col <- ifelse(severe$CHR %% 2 == 0, 'even','odd')
+severe$chr_col <- ifelse(severe$q <= 0.003559751, 's',severe$chr_col)
+
+chr.group <- c(even = '#27384A',odd = '#48C095',s='#BC0020')
+
+severe %>% 
+  filter(is.na(P) == F) %>%
+  ggplot(aes(x=CHR,y=-log10(P))) +
+  geom_jitter(aes(col=chr_col)) +
+  geom_hline(yintercept=-log10(0.05/nrow(severe)), col='#BC0020',
+             linetype='dashed') +
+  scale_color_manual(values = chr.group) +
+  theme_classic() +
+  theme(legend.position = 'none') +
+  scale_x_continuous(labels = c(1:22,'X'),breaks = 1:23) +
+  xlab('Chromosomes')
+```
+
+```{r severe_table, echo=FALSE}
+kable(severe %>% select(-chr_col,-CHR,-BP) %>% slice_head(n=2) %>% 
+        mutate(Gene = 'LZTFL1') %>%
+        relocate(Gene, .before = SNP),
+      caption = 'https://www.medrxiv.org/content/10.1101/2021.03.31.21254708v1')
+```
+
+
+
+```{r resistance_q_manhattan_plot, echo=F}
+resistance$chr_col <- NA
+resistance$chr_col <- ifelse(resistance$CHR %% 2 == 0, 'even','odd')
+resistance$chr_col <- ifelse(resistance$q <= 0.003559751, 's',resistance$chr_col)
+
+chr.group <- c(even = '#27384A',odd = '#48C095',s='#BC0020')
+
+resistance %>% 
+  filter(is.na(P) == F) %>%
+  ggplot(aes(x=CHR,y=-log10(P))) +
+  geom_jitter(aes(col=chr_col)) +
+  geom_hline(yintercept=-log10(0.05/nrow(resistance)), col='#BC0020',
+             linetype='dashed') +
+  scale_color_manual(values = chr.group) +
+  theme_classic() +
+  theme(legend.position = 'none') +
+  scale_x_continuous(labels = c(1:22,'X'),breaks = 1:23) +
+  xlab('Chromosomes')
+```
+
+
+
+
+<!-- ### 2. Rare variants -->
+
+
+
+<!-- ```{r regenie_out, echo=F} -->
+
+
+
+
+<!-- ``` -->
+
+
+
+
