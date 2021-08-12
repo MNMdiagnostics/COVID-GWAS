@@ -1,0 +1,112 @@
+---
+title: "Rare variants analysis"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressMessages(library(knitr))
+suppressMessages(library(data.table))
+suppressMessages(library(tidyverse))
+suppressMessages(library(qvalue))
+
+outlier <- function (x) {
+  IQR <- quantile(x)[[4]] - quantile(x)[[2]]
+  low <- quantile(x)[[2]] - 1.5*IQR
+  high <- quantile(x)[[4]] + 1.5*IQR
+  out_val <- x[x < low | x > high]
+  return(out_val)
+}
+```
+
+
+```{r loading_data, echo=F}
+res1 <- fread('../../../output_data/OUTPUT/210719/regenieRes/MNM/burden.res.common.1.perc_Covid_resistance.regenie') %>% 
+  na.omit() %>%
+  arrange(Pval,Alt) %>%
+  mutate(Name = gsub("\\..*","",Name))
+
+res1 %>% filter(Pval < 0.01) %>% 
+  write.table('res1_sig.txt',
+              col.names = T,
+              row.names = F,
+              sep='\t',
+              quote=F)
+
+res01 <- fread('../../../output_data/OUTPUT/210719/regenieRes/MNM/burden.res.common.0.1.perc_Covid_resistance.regenie') %>% 
+  na.omit() %>%
+  arrange(Pval) %>%
+  mutate(Name = gsub("\\..*","",Name))
+
+res01 %>% filter(Pval < 0.01) %>% 
+  write.table('res01_sig.txt',
+              col.names = T,
+              row.names = F,
+              sep='\t',
+              quote=F)
+
+```
+
+
+
+### 1. Rare variants with MAF < 1%
+
+```{r res_1_q_manhattan_plot, echo=F}
+res1_man <- res1 %>% 
+  mutate(Padj = 0.01/length(unique(res1$Name))) %>%
+  relocate(Padj, .after=Pval) %>%
+  arrange(Padj)
+
+res1_man$chr_col <- NA
+res1_man$chr_col <- ifelse(res1_man$Chr %% 2 == 0, 'even','odd')
+res1_man$chr_col <- ifelse(res1_man$Pval <= 0.01 & grepl(res1_man$Alt, pattern = 'M3') == T, 's',res1_man$chr_col)
+
+res1_man$chr_col <- ifelse(res1_man$Pval <= 0.01 & grepl(res1_man$Alt, pattern = 'M1') == T, 's',res1_man$chr_col)
+
+
+chr.group <- c(even = '#27384A',odd = '#48C095',s='#BC0020')
+
+
+res1_man %>%
+  filter(is.na(Pval) == F) %>%
+  ggplot(aes(x=Chr,y=-log10(Pval))) +
+  geom_jitter(aes(col=chr_col)) +
+  scale_color_manual(values = chr.group) +
+  theme_classic() +
+  theme(legend.position = 'none') +
+  geom_hline(yintercept = c(-log10(0.01)),
+              col='#BC0020',
+              linetype='dashed') +
+  scale_x_continuous(labels = c(1:22,'X'),breaks = 1:23) +
+  xlab('Chromosomes')
+```
+
+### 2. Rare variants with MAF < 0.1%
+
+```{r res_01_q_manhattan_plot, echo=F}
+res01_man <- res01 %>% mutate(Qval = qvalue(Pval)$qvalue) %>%
+  relocate(Qval, .after=Pval)
+
+res01_man$chr_col <- NA
+res01_man$chr_col <- ifelse(res01_man$Chr %% 2 == 0, 'even','odd')
+res01_man$chr_col <- ifelse(res01_man$Pval <= 0.01 & grepl(res01_man$Alt, pattern = 'M3') == T, 's',res01_man$chr_col)
+
+res01_man$chr_col <- ifelse(res01_man$Pval <= 0.01 & grepl(res01_man$Alt, pattern = 'M1') == T, 's',res01_man$chr_col)
+
+
+chr.group <- c(even = '#27384A',odd = '#48C095',s='#BC0020')
+
+res01_man %>% 
+    filter(is.na(Pval) == F) %>%
+  ggplot(aes(x=Chr,y=-log10(Pval))) +
+    geom_jitter(aes(col=chr_col)) +
+  scale_color_manual(values = chr.group) +
+  theme_classic() +
+  theme(legend.position = 'none') +
+  geom_hline(yintercept = c(-log10(0.01)),
+              col='#BC0020',
+              linetype='dashed') +
+  scale_x_continuous(labels = c(1:22,'X'),breaks = 1:23) +
+  xlab('Chromosomes')
+```
+
