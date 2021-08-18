@@ -1,0 +1,69 @@
+---
+title: "pulmo_panel"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressMessages(library(knitr))
+suppressMessages(library(data.table))
+suppressMessages(library(tidyverse))
+suppressMessages(library(qvalue))
+
+outlier <- function (x) {
+  IQR <- quantile(x)[[4]] - quantile(x)[[2]]
+  low <- quantile(x)[[2]] - 1.5*IQR
+  high <- quantile(x)[[4]] + 1.5*IQR
+  out_val <- x[x < low | x > high]
+  return(out_val)
+}
+```
+
+Results on 1076 unrelated individuals
+
+
+```{r loading_data, echo=F}
+severe <- fread('/mnt/theta/output_data/MS_gwas_data/output/pulmo/pulmo_plink.assoc.logistic.adjusted')
+
+severe %>% ggplot(aes(x=-log10(QQ),y=-log10(UNADJ))) +
+  geom_point(col='#48C095') +
+  geom_smooth(method='lm', col='#27384A') +
+  theme_minimal()
+
+
+# 
+# resistance <- fread('../output/CARDIAC/multisample_CARDIAC_filtered.pruned.resistance.assoc.logistic')
+# resistance <- resistance %>% 
+#   mutate(q = qvalue(P)$qvalue) %>% 
+#   na.omit() %>%
+#   arrange(q)
+```
+
+
+```{r q_manhattan_plot, echo=F}
+severe$chr_col <- NA
+severe$chr_col <- ifelse(severe$CHR %% 2 == 0, 'even','odd')
+severe$chr_col <- ifelse(severe$FDR_BH <= 0.3, 's',severe$chr_col)
+
+chr.group <- c(even = '#27384A',odd = '#48C095',s='#BC0020')
+
+severe %>% 
+  filter(is.na(UNADJ) == F) %>%
+  ggplot(aes(x=CHR,y=-log10(UNADJ))) +
+  geom_jitter(aes(col=chr_col)) +
+  scale_color_manual(values = chr.group) +
+  theme_classic() +
+  theme(legend.position = 'none') +
+  scale_x_continuous(labels = c(1:22,'X'),breaks = 1:23) +
+  xlab('Chromosomes') +
+  ylim(c(0,6)) +
+  ylab('-log10 Pvalue')
+```
+
+```{r echo=F}
+kable(severe %>% filter(chr_col == 's') %>%
+        select(CHR,SNP,UNADJ,FDR_BH,FDR_BY) %>%
+        rename(Pvalue = UNADJ)
+)
+
+```
