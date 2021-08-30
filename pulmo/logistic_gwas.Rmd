@@ -9,6 +9,7 @@ suppressMessages(library(knitr))
 suppressMessages(library(data.table))
 suppressMessages(library(tidyverse))
 suppressMessages(library(qvalue))
+suppressMessages(library(readxl))
 
 outlier <- function (x) {
   IQR <- quantile(x)[[4]] - quantile(x)[[2]]
@@ -23,7 +24,11 @@ Results on 1076 unrelated individuals
 
 
 ```{r loading_data, echo=F}
-severe <- fread('/mnt/theta/output_data/MS_gwas_data/output/pulmo/pulmo_plink.assoc.logistic.adjusted')
+vep <- fread('pulmo_set.vcf.gz.vep.tsv.gz',header=T) %>% rename(SNP='#Uploaded_variation') %>%
+  select(SNP,Gene,SYMBOL,IMPACT,Consequence)
+
+severe <- fread('/mnt/theta/output_data/MS_gwas_data/output/pulmo/pulmo_plink.assoc.logistic.adjusted') %>% left_join(vep)
+
 
 severe %>% ggplot(aes(x=-log10(QQ),y=-log10(UNADJ))) +
   geom_point(col='#48C095') +
@@ -31,12 +36,6 @@ severe %>% ggplot(aes(x=-log10(QQ),y=-log10(UNADJ))) +
   theme_minimal()
 
 
-# 
-# resistance <- fread('../output/CARDIAC/multisample_CARDIAC_filtered.pruned.resistance.assoc.logistic')
-# resistance <- resistance %>% 
-#   mutate(q = qvalue(P)$qvalue) %>% 
-#   na.omit() %>%
-#   arrange(q)
 ```
 
 
@@ -52,6 +51,7 @@ severe %>%
   ggplot(aes(x=CHR,y=-log10(UNADJ))) +
   geom_jitter(aes(col=chr_col)) +
   scale_color_manual(values = chr.group) +
+  geom_text(aes(label=ifelse(chr_col == 's', SYMBOL, '')), hjust=-0.3) +
   theme_classic() +
   theme(legend.position = 'none') +
   scale_x_continuous(labels = c(1:22,'X'),breaks = 1:23) +
@@ -62,7 +62,7 @@ severe %>%
 
 ```{r echo=F}
 kable(severe %>% filter(chr_col == 's') %>%
-        select(CHR,SNP,UNADJ,FDR_BH,FDR_BY) %>%
+        select(SYMBOL,SNP,UNADJ,FDR_BH) %>%
         rename(Pvalue = UNADJ)
 )
 
