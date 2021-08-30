@@ -23,43 +23,48 @@ Results on 1076 unrelated individuals
 8129 variants with MAF > 0.01 and LD pruning (indep-pairwise 50 5 0.05)
 
 
+
 ```{r loading_data, echo=F}
-severe <-   fread('../../../output_data/MS_gwas_data/output/cardiac/cardiac_plink.assoc.logistic')
-severe <- severe %>% 
-  mutate(q = qvalue(P)$qvalue) %>% 
-  na.omit() %>%
-  arrange(q)
-# 
-# resistance <- fread('../output/CARDIAC/multisample_CARDIAC_filtered.pruned.resistance.assoc.logistic')
-# resistance <- resistance %>% 
-#   mutate(q = qvalue(P)$qvalue) %>% 
-#   na.omit() %>%
-#   arrange(q)
-```
+vep <- fread('cardiac_fullset_sorted.vcf.gz.vep.tsv.gz',header=T) %>% rename(SNP='#Uploaded_variation') %>%
+  select(SNP,Gene,SYMBOL,IMPACT,Consequence)
 
-```{r echo=F}
-kable(severe %>% filter(q <= min(severe$q)) %>%
-        select(-c(CHR,BP,A1)) %>%
-        mutate(SYMBOL = c('HADHA','HADHB')) %>%
-        relocate(SYMBOL,.before = SNP)
-        , caption = 'https://onlinelibrary.wiley.com/doi/10.1002/jmd2.12165')
+severe <- fread('/mnt/theta/output_data/MS_gwas_data/output/cardiac/cardiac_plink.assoc.logistic.adjusted') %>% left_join(vep)
+
+
+severe %>% ggplot(aes(x=-log10(QQ),y=-log10(UNADJ))) +
+  geom_point(col='#48C095') +
+  geom_smooth(method='lm', col='#27384A') +
+  theme_minimal()
+
 
 ```
+
 
 ```{r q_manhattan_plot, echo=F}
 severe$chr_col <- NA
 severe$chr_col <- ifelse(severe$CHR %% 2 == 0, 'even','odd')
-severe$chr_col <- ifelse(severe$q <= min(severe$q), 's',severe$chr_col)
+severe$chr_col <- ifelse(severe$FDR_BH <= 0.05, 's',severe$chr_col)
 
 chr.group <- c(even = '#27384A',odd = '#48C095',s='#BC0020')
 
 severe %>% 
-  filter(is.na(P) == F) %>%
-  ggplot(aes(x=CHR,y=-log10(P))) +
+  filter(is.na(UNADJ) == F) %>%
+  ggplot(aes(x=CHR,y=-log10(UNADJ))) +
   geom_jitter(aes(col=chr_col)) +
   scale_color_manual(values = chr.group) +
+  #geom_text(aes(label=ifelse(chr_col == 's', SYMBOL, '')), hjust=-0.3) +
   theme_classic() +
   theme(legend.position = 'none') +
   scale_x_continuous(labels = c(1:22,'X'),breaks = 1:23) +
-  xlab('Chromosomes')
+  xlab('Chromosomes') +
+  ylim(c(0,6)) +
+  ylab('-log10 Pvalue')
+```
+
+```{r echo=F}
+kable(severe %>% filter(chr_col == 's') %>%
+        select(SYMBOL,SNP,UNADJ,FDR_BH) %>%
+        rename(Pvalue = UNADJ)
+)
+
 ```
