@@ -28,7 +28,10 @@ Results on 1076 unrelated individuals
 vep <- fread('cardiac_fullset_sorted.vcf.gz.vep.tsv.gz',header=T) %>% rename(SNP='#Uploaded_variation') %>%
   select(SNP,Gene,SYMBOL,IMPACT,Consequence)
 
-severe <- fread('/mnt/theta/output_data/MS_gwas_data/output/cardiac/cardiac_plink.assoc.logistic.adjusted') %>% left_join(vep)
+
+or  <- fread('/mnt/theta/output_data/MS_gwas_data/output/cardiac/cardiac_plink.assoc.logistic') %>%
+  select(SNP,OR)
+severe <- fread('/mnt/theta/output_data/MS_gwas_data/output/cardiac/cardiac_plink.assoc.logistic.adjusted') %>% left_join(vep) %>% left_join(or)
 
 
 severe %>% ggplot(aes(x=-log10(QQ),y=-log10(UNADJ))) +
@@ -61,9 +64,28 @@ severe %>%
   ylab('-log10 Pvalue')
 ```
 
+```{r OR plot, echo=FALSE}
+severe %>% filter(chr_col == 's') %>% distinct() %>%
+  #left_join(vep_cardiac, by = 'SNP') %>% na.omit() %>%
+  ggplot(aes(y=reorder(SNP,-OR),x=OR)) + 
+  geom_point(col="#48C095") +
+  geom_text(aes(label=SYMBOL),hjust=-0.2, vjust=0.2) +
+  geom_vline(xintercept = 1,linetype='dashed',col="#BC0020") +
+  ylab('SNP') +
+  xlab('Odds ratio') +
+  ggtitle('Estimated odds ratio (OR) of minor allele occurence', 
+          subtitle = 'Red dashed line: OR = 1.0') +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust=0.5))
+```
+
+
+
+
 ```{r echo=F}
-kable(severe %>% filter(chr_col == 's') %>%
-        select(SYMBOL,SNP,UNADJ,FDR_BH) %>%
+kable(severe %>% filter(chr_col == 's') %>% distinct() %>%
+        select(SYMBOL,SNP,UNADJ,FDR_BH,OR) %>%
         rename(Pvalue = UNADJ)
 )
 
