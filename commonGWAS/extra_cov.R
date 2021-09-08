@@ -1,14 +1,15 @@
 library(tidyverse)
-new_age <- read.table('new_age.csv',header=T,sep=',') 
-ped <- read.table('input/ped.csv',header=T,sep=',') %>% arrange(Individual_ID) %>%
-  select(-Age) %>% left_join(new_age)
+ped <- read.table('input/ped.tsv',header=T,sep='\t')
 
 id_to_include <- read.table('../../genom_polaka/SAMPLES_TO_INCLUDE_210716.txt',
                             col.names = 'IID')
 
 covars <- ped %>% select(Family_ID,Individual_ID,Sex,Age) %>%
   filter(Individual_ID %in% id_to_include$IID) %>%
-  mutate(Age_centered = Age - mean(Age, na.rm=T), Family_ID = 0) %>%
+  mutate(Age_sex = Age * Sex,
+         Age_sq = Age^2,
+         Age_sq_sex = (Age^2) * Sex,
+         Family_ID = 0) %>%
   relocate(Family_ID, .before = Individual_ID) %>%
   rename(FID = Family_ID, IID = Individual_ID)
 
