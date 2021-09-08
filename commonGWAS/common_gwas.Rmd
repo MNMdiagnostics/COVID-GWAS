@@ -19,11 +19,15 @@ outlier <- function (x) {
 }
 ```
 
-Results on 1076 unrelated individuals
-
+Results on 1076 unrelated individuals and 973,771 SNPs
+ 
 
 ```{r loading_data, echo=F}
-severe <- fread('/mnt/theta/output_data/MS_gwas_data/output/fullset/multisample_0716_severe.assoc.logistic.adjusted')
+severe <- fread('/mnt/theta/output_data/MS_gwas_data/output/fullset/multisample_0716_severe.assoc.logistic.adjusted') 
+
+severe_odds <- fread('/mnt/theta/output_data/MS_gwas_data/output/fullset/multisample_0716_severe.assoc.logistic') %>% select(SNP,OR,L95,U95)
+
+severe <- severe %>% left_join(severe_odds)
 
 vep_severe <- fread('/mnt/theta/output_data/MS_gwas_data/full_set/common_severe.tsv',header = T) %>%
   rename(SNP = Uploaded_variation) %>% select(SNP,SYMBOL,IMPACT,Consequence)
@@ -78,7 +82,7 @@ severe %>%
 
 ```{r echo=F}
 kable(head(severe,15) %>%
-        select(SYMBOL, IMPACT, Consequence, SNP,UNADJ,FDR_BH,FDR_BY) %>%
+        select(SNP,SYMBOL,  Consequence, UNADJ,OR) %>%
         rename(Pvalue = UNADJ)
 )
 

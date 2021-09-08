@@ -20,7 +20,7 @@ outlier <- function (x) {
 }
 ```
 
-Results on 1076 unrelated individuals
+Results on 1076 unrelated individuals and 4,464 SNPs
 
 
 ```{r loading_data, echo=F}
@@ -83,7 +83,7 @@ severe %>% filter(chr_col == 's') %>%
 
 ```{r echo=F}
 kable(severe %>% filter(chr_col == 's') %>%
-        select(SYMBOL,SNP,UNADJ,FDR_BH,OR) %>%
+        select(SNP,SYMBOL,  Consequence, UNADJ,OR) %>%
         rename(Pvalue = UNADJ)
 )
 

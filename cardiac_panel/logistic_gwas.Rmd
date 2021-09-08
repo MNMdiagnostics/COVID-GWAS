@@ -19,10 +19,7 @@ outlier <- function (x) {
 }
 ```
 
-Results on 1076 unrelated individuals
-8129 variants with MAF > 0.01 and LD pruning (indep-pairwise 50 5 0.05)
-
-
+Results on 1076 unrelated individuals and 8,129 SNPs
 
 ```{r loading_data, echo=F}
 vep <- fread('cardiac_fullset_sorted.vcf.gz.vep.tsv.gz',header=T) %>% rename(SNP='#Uploaded_variation') %>%
@@ -85,7 +82,7 @@ severe %>% filter(chr_col == 's') %>% distinct() %>%
 
 ```{r echo=F}
 kable(severe %>% filter(chr_col == 's') %>% distinct() %>%
-        select(SYMBOL,SNP,UNADJ,FDR_BH,OR) %>%
+        select(SNP,SYMBOL,  Consequence, UNADJ,OR) %>%
         rename(Pvalue = UNADJ)
 )
 
