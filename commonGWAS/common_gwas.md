@@ -8,7 +8,7 @@ Results on 1076 unrelated individuals
 
 ### Severe manhattan plot
 
-    ## Warning: Removed 28 rows containing missing values (geom_point).
+    ## Warning: Removed 33 rows containing missing values (geom_point).
 
 ![](common_gwas_files/figure-gfm/q_manhattan_plot-1.png)<!-- -->
 
@@ -32,6 +32,8 @@ Results on 1076 unrelated individuals
 | SELENOI    | MODIFIER | intron\_variant                                  | chr2\_26371642\_C\_T     | 1.86e-05 |  0.9881 |       1 |
 | AP002991.1 | MODIFIER | intron\_variant,non\_coding\_transcript\_variant | chr11\_115732655\_G\_A   | 1.86e-05 |  0.9881 |       1 |
 
-    ## Warning: Removed 18 rows containing missing values (geom_point).
+### Resistors manhattan
+
+    ## Warning: Removed 23 rows containing missing values (geom_point).
 
 ![](common_gwas_files/figure-gfm/manhattan_plot_resist-1.png)<!-- -->

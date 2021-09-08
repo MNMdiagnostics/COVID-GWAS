@@ -85,6 +85,8 @@ kable(head(severe,15) %>%
 ```
 
 
+### Resistors manhattan
+
 ```{r manhattan_plot_resist, echo=F}
 resistance$chr_col <- NA
 resistance$chr_col <- ifelse(resistance$CHR %% 2 == 0, 'even','odd')
