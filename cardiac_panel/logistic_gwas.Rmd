@@ -78,12 +78,31 @@ severe %>% filter(chr_col == 's') %>% distinct() %>%
 ```
 
 
-
+### Significant variants
 
 ```{r echo=F}
 kable(severe %>% filter(chr_col == 's') %>% distinct() %>%
         select(SNP,SYMBOL,  Consequence, UNADJ,OR) %>%
         rename(Pvalue = UNADJ)
 )
+
+```
+
+### Variants in high LD with significant variants
+
+```{r haplotypes, echo=F}
+sigs <- head(severe$SNP,2)
+
+blocks <- fread('/mnt/theta/output_data/MS_gwas_data/output/cardiac/cardiac_block.blocks.det')
+blocks <- blocks %>% filter(grepl(sigs[1],blocks$SNPS) | grepl(sigs[2],blocks$SNPS))
+
+SNPS <- unlist(str_split(blocks$SNPS[1],pattern = '\\|'))
+
+vep_block <- vep %>% filter(SNP %in% SNPS) %>% arrange(IMPACT)
+
+freq_fisher <- fread('/mnt/theta/output_data/MS_gwas_data/output/cardiac/cardiac.assoc.fisher') %>%
+  right_join(vep_block)
+
+kable(head(vep_block,2))
 
 ```
