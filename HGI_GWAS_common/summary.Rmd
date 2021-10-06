@@ -1,0 +1,20 @@
+---
+title: "HGI Common variants GWAS"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(data.table))
+```
+
+```{r setup, include=FALSE}
+res30 <- fread('/mnt/theta/output_data/MS_gwas_data/HGI_SAGE/output/chr21/chr21_30markers.SAIGE.results.txt')
+
+res <- fread('/mnt/theta/output_data/MS_gwas_data/HGI_SAGE/output/chr21/chr21.SAIGE.bgen.txt') %>%
+  arrange(p.value)
+
+
+```
+
