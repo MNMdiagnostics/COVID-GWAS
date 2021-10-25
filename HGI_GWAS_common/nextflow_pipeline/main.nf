@@ -1,12 +1,19 @@
-datasets = Channel
-                .fromPath(params.input)
-                .map { file -> tuple(file.baseName, file) }
+// datasets = Channel
+//                 .fromPath(params.input)
+//                 .map { file -> tuple(file.baseName, file) }
+
+Channel
+	.fromPath("${params.input}")
+	.splitCsv(header:["datasetID","vcf"], sep:'\t', skip: 1)
+	.map { row -> [row.sample_id, file(row.vcf, checkIfExists: true)] }
+	.set { ch_input}
 
 process vcf_to_plink {
+  tag "$datasetID"
 	input:
-	set datasetID, file(datasetFile) from datasets
+	set datasetID, file(datasetFile) from ch_input
 	output:
-	set datasetID,
+	tuple val(datasetID),
 	file("${datasetID}.bed"),
 	file("${datasetID}.bim"),
 	file("${datasetID}.fam") into plink_format
@@ -16,78 +23,17 @@ process vcf_to_plink {
   --vcf-half-call r \\
   --make-bed \\
   --out ${datasetID} \\
-  --snps-only
+  --snps-only \\
+  --keep ${baseDir}/data/${datasetID}.txt
 	"""
 }
-
-process add_familyID_and_sex {
-	input:
-	set datasetID,
-	file("${datasetID}.bed"),
-	file("${datasetID}.bim"),
-	file("${datasetID}.fam")	from plink_format
-	output:
-	set datasetID,
-	file("${datasetID}.bed"),
-	file("${datasetID}.bim"),
-	file("${datasetID}.fam") into new_fam
-	script:
-	"""
-	#!/usr/bin/env Rscript
-	suppressMessages(library(tidyverse))
-
-	ped <- read.table('/root/COVID-GWAS/input/ped.tsv',sep='\t',header=T) %>%
-	arrange(Individual_ID)
-
-	fam <- read.table("${datasetID}.fam",
-	                  col.names = c('FID','IID','PID','MID','Sex','Pheno'),
-	                  header=F,
-	                  sep='\t') %>%
-										arrange(IID)
-
-	fam\$FID <- ped\$Family_ID
-	fam\$PID <- ped\$Paternal_ID
-	fam\$MID <- ped\$Maternal_ID
-	fam\$Sex <- ped\$Sex
-
-	fam %>%
-	  mutate(PID = ifelse(PID == '',0,PID),
-	         MID = ifelse(MID == '',0,MID)) %>%
-					 write.table("${datasetID}.fam",
-			 	              quote = F,
-			 	              sep='\t',
-			 	              col.names = F,
-			 	              row.names = F)
-
-	"""
-}
-
-// process chrX_PAR {
-// 	input:
-// 	set datasetID,
-// 	file("${datasetID}.bed"),
-// 	file("${datasetID}.bim"),
-// 	file("${datasetID}.fam")	from new_fam
-// 	output:
-// 	set datasetID,
-// 	file("${datasetID}.par.bed"),
-// 	file("${datasetID}.par.bim"),
-// 	file("${datasetID}.par.fam") into chrX_PAR
-// 	script:
-// 	"""
-//
-//   plink --bfile ${datasetID} --split-x hg38 --make-bed --out ${datasetID}.par
-// 	"""
-// }
-
-	//plink2 --bfile ${datasetID} --split-par hg38 --make-bed --out ${datasetID}.par
 
 process callrate_and_missing {
 	input:
 	set datasetID,
   file("${datasetID}.bed"),
 	file("${datasetID}.bim"),
-	file("${datasetID}.fam") from new_fam
+	file("${datasetID}.fam") from plink_format
 	output:
 	set datasetID,
 	file("${datasetID}.par.qc.bed"),
@@ -95,7 +41,7 @@ process callrate_and_missing {
 	file("${datasetID}.par.qc.fam") into geno_mind
 	script:
 	"""
-	plink --bfile ${datasetID} --geno 0.02 --make-bed --out ${datasetID}.par.qc
+	plink --bfile ${datasetID} --geno 0.02 --make-bed --out ${datasetID}.par.qc --allow-no-sex
 	"""
 }
 
@@ -103,68 +49,6 @@ geno_mind.into{
 	hwe;
 	maf_filter
 }
-
-// process prep_pheno_hwe {
-// 	input:
-// 	set datasetID,
-// 	file("${datasetID}.par.qc.bed"),
-// 	file("${datasetID}.par.qc.bim"),
-// 	file("${datasetID}.par.qc.fam") from hwe_pheno
-// 	output:
-//   set datasetID,
-//   file("${datasetID}.par.qc.bed"),
-//   file("${datasetID}.par.qc.bim"),
-//   file("${datasetID}.par.qc.fam"),
-//   file("pheno.txt")  into hwe_phenotype
-// 	script:
-// 	"""
-// 	#!/usr/bin/env Rscript
-// 	suppressMessages(library(tidyverse))
-//
-// 	ped <- read.table('/root/COVID-GWAS/input/ped.tsv',sep='\t',header=T) %>%
-// 	arrange(Individual_ID)
-// 	fam <- read.table("${datasetID}.par.qc.fam",
-// 										col.names = c('FID','IID','PID','MID','Sex','Pheno'),
-// 										header=T,
-// 										sep='\t') %>%
-// 										arrange(IID)
-//
-// 	pheno <- ped %>%
-// 	  select(Family_ID,Individual_ID,HGI.phenotype) %>%
-// 	  mutate(A2 = ifelse(grepl('A2',HGI.phenotype)==T,2,1),
-// 	         B2 = ifelse(grepl('B2',HGI.phenotype)==T,2,1),
-// 	         C2 = ifelse(grepl('C2',HGI.phenotype)==T,2,1)) %>%
-// 	  select(-HGI.phenotype) %>%
-// 	  rename(IID = Individual_ID,
-// 			FID = Family_ID) %>%
-// 		arrange(IID) %>%
-// 		filter(IID %in% fam\$IID)
-//
-// 	pheno %>% write.table("pheno.txt",
-// 	                      col.names = T,
-// 	                      row.names=F,
-// 	                      quote = F,
-// 	                      sep='\t')
-// 	"""
-// }
-
-
-// process maf_filter {
-// 	input:
-// 	set datasetID,
-//   file("${datasetID}.par.qc.bed"),
-//   file("${datasetID}.par.qc.bim"),
-//   file("${datasetID}.par.qc.fam")  from maf_filter
-// 	output:
-// 	set datasetID,
-// 	file("${datasetID}.maf.bed"),
-// 	file("${datasetID}.maf.bim"),
-// 	file("${datasetID}.maf.fam") into common_variants
-// 	script:
-// 	"""
-// 	plink2 --bfile ${datasetID}.par.qc --maf 0.01 --out ${datasetID}.maf --make-bed
-// 	"""
-// }
 
 process hwe_filter {
 	input:
@@ -179,7 +63,7 @@ process hwe_filter {
 	file("${datasetID}.clean.fam") into clean_dataset
 	script:
 	"""
-	plink --bfile ${datasetID}.par.qc --hwe 1e-6 --make-bed --out ${datasetID}.clean
+	plink --bfile ${datasetID}.par.qc --hwe 1e-6 --make-bed --out ${datasetID}.clean --allow-no-sex
 	"""
 }
 
@@ -203,7 +87,7 @@ process PCA {
   file("${datasetID}.eigenvec") into pca
 	script:
 	"""
-  plink --bfile ${datasetID}.clean \\
+  plink --bfile ${datasetID}.clean --allow-no-sex \\
   --make-bed \\
   --maf 0.01 \\
   --indep-pairwise 50 5 0.05 \\
@@ -228,13 +112,14 @@ process convert_to_bgen {
   file("${datasetID}.bgen.bgi") into bgen
 	script:
 	"""
-	plink2 --bfile ${datasetID}.clean \\
+  plink2 --bfile ${datasetID}.clean --allow-no-sex \\
   --export bgen-1.2 id-delim=' ' bits=8 \\
   --out ${datasetID}
   bgenix -index -g ${datasetID}.bgen \\
   -clobber
 	"""
 }
+
 
 process saige_pheno {
 	input:
@@ -250,59 +135,21 @@ process saige_pheno {
   file("${datasetID}.clean.fam"),
   file("pheno.txt"),
   file("samples_id.txt"),
-  file("males_id.txt")  into saige_plink_input
+  file("males_id.txt"),
+  file("females_id.txt"),
+  file("above60_id.txt"),
+  file("60orbelow_id.txt")  into saige_plink_input
 	script:
 	"""
-  #!/usr/bin/env Rscript
-
-  suppressMessages(library(tidyverse))
-
-  pca <- read.table("${datasetID}.eigenvec",header=F,sep=' ',
-  col.names = c('FID','IID',paste('PC',1:20,sep='')))
-  ped <- read.table('/root/COVID-GWAS/input/ped.tsv',sep='\t',header=T)
-  fam <- read.table("${datasetID}.clean.fam",
-                    col.names = c('FID','IID','PID','MID','Sex','Pheno'),
-                    header=F,
-                    sep=' ')
-
-  pheno <- ped %>%
-    select(Individual_ID,HGI.phenotype,Sex,Age) %>%
-    mutate(A2 = ifelse(grepl('A2',HGI.phenotype)==T,1,0),
-           B2 = ifelse(grepl('B2',HGI.phenotype)==T,1,0),
-           C2 = ifelse(grepl('C2',HGI.phenotype)==T,1,0),
-           Age_sq = Age^2,
-           Age_sex = Age*Sex) %>%
-    select(-HGI.phenotype) %>%
-    rename(IID = Individual_ID) %>%
-    arrange(IID) %>%
-    left_join(pca)
-
-  pheno %>% write.table("pheno.txt",
-                        col.names = T,
-                        row.names=F,
-                        quote = F,
-                        sep='\t')
-
-  pheno %>%
-  select(IID) %>%
-  write.table("samples_id.txt",
-                        col.names = F,
-                        row.names=F,
-                        quote = F,
-                        sep='\t')
-
-  pheno %>%
-  filter(Sex == 2) %>%
-  select(IID) %>%
-  write.table("males_id.txt",
-                        col.names = F,
-                        row.names=F,
-                        quote = F,
-                        sep='\t')
+  Rscript ${baseDir}/bin/saige_phenocovar.R ${datasetID}.eigenvec ${baseDir}/data/ped.tsv ${datasetID}.clean.fam 
 	"""
 }
 
+
+A2 B2 C2 Covid_resitance
+
 process step1_fitNULLGLMM {
+  conda 'saige.yml'
 	input:
   set datasetID,
   file("${datasetID}.clean.bed"),
@@ -310,35 +157,45 @@ process step1_fitNULLGLMM {
 	file("${datasetID}.clean.fam"),
   file("pheno.txt"),
   file("samples_id.txt"),
-  file("males_id.txt")  from saige_plink_input
+  file("males_id.txt"),
+  file("females_id.txt"),
+  file("above60_id.txt"),
+  file("60orbelow_id.txt")  from saige_plink_input
 	output:
 	set datasetID,
   file("${datasetID}.rda"),
   file("${datasetID}.varianceRatio.txt"),
   file("${datasetID}_30markers.SAIGE.results.txt"),
   file("samples_id.txt"),
-  file("males_id.txt") into step1_output
-	script:
+  file("males_id.txt"),
+  file("females_id.txt"),
+  file("above60_id.txt"),
+  file("60orbelow_id.txt") into step1_output
+  script:
 	"""
-  step1_fitNULLGLMM.R     \\
-          --plinkFile=${datasetID}.clean  \\
-          --phenoFile=pheno.txt \\
-          --phenoCol=A2  \\
-          --covarColList=Age,Age_sq,Sex,Age_sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20 \\
-          --sampleIDColinphenoFile=IID \\
-          --traitType=binary  \\
-          --outputPrefix=${datasetID} \\
-          --nThreads=20	\\
+  step1_fitNULLGLMM.R    \\
+    --plinkFile=${datasetID}.clean  \\
+    --phenoFile=pheno.txt \\
+    --phenoCol=A2 \\
+    --covarColList=Age,Age_sq,Sex,Age_sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20 \\
+    --sampleIDColinphenoFile=IID \\
+    --traitType=binary  \\
+    --outputPrefix=${datasetID} \\
+    --nThreads=20	\\
   	--LOCO=FALSE  \\
   	--minMAFforGRM=0.01 \\
     --IsOverwriteVarianceRatioFile=TRUE
 	"""
 }
 
+
+
 bgen.join(step1_output).set{step2_input}
 
 process step2_SPAtests {
-	input:
+  conda 'saige.yml'
+  publishDir "${params.output}/${datasetFile}"
+	input:  
   set datasetID,
   file("${datasetID}.bgen"),
   file("${datasetID}.bgen.bgi"),
@@ -346,10 +203,15 @@ process step2_SPAtests {
   file("${datasetID}.varianceRatio.txt"),
   file("${datasetID}_30markers.SAIGE.results.txt"),
   file("samples_id.txt"),
-  file("males_id.txt")  from step2_input
+  file("males_id.txt"),
+  file("females_id.txt"),
+  file("above60_id.txt"),
+  file("60orbelow_id.txt")  from step2_input
 	output:
 	set datasetID,
-  file("${datasetID}.SAIGE.bgen.txt") into step2_output
+  file("${datasetID}_a2.SAIGE.bgen.txt"),
+  file("${datasetID}.varianceRatio.txt"),
+  file("${datasetID}_30markers.SAIGE.results.txt") into output
 	script:
 	"""
   step2_SPAtests.R    \\
@@ -367,7 +229,8 @@ process step2_SPAtests {
   --IsOutputHetHomCountsinCaseCtrl=TRUE \\
   --LOCO=FALSE \\
   --sampleFile_male=males_id.txt \\
-  --X_PARregion=10001-2781479,155701383-156030895
+  --X_PARregion=10001-2781479,155701383-156030895 \\
+  --is_rewrite_XnonPAR_forMales=TRUE
 	"""
 }
 
