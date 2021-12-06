@@ -1,6 +1,6 @@
  #!/usr/bin/env Rscript
 
-suppressMessages(library(tidyverse))
+suppressMessages(library(dplyr))
 args = commandArgs(trailingOnly=TRUE)
 
 pca <- read.table(args[1],header=F,sep=' ',

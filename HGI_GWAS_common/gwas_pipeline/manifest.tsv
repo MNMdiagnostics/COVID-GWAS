@@ -1,4 +1,5 @@
-all_samples_id,/output_data/MS_gwas_data/HGI_SAGE/input/test/chr21X.vcf.gz
-males_id,/output_data/MS_gwas_data/HGI_SAGE/input/test/chr21X.vcf.gz
-60orbelow_id,/output_data/MS_gwas_data/HGI_SAGE/input/test/chr21X.vcf.gz
-above60_id,/output_data/MS_gwas_data/HGI_SAGE/input/test/chr21X.vcf.gz
+all_samples_id,data/multisample_20210716.dv.bcfnorm.filt.vcf.gz
+males_id,data/multisample_20210716.dv.bcfnorm.filt.vcf.gz
+females_id,data/multisample_20210716.dv.bcfnorm.filt.vcf.gz
+60orbelow_id,data/multisample_20210716.dv.bcfnorm.filt.vcf.gz
+above60_id,data/multisample_20210716.dv.bcfnorm.filt.vcf.gz

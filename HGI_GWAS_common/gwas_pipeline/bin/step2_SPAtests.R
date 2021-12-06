@@ -67,7 +67,7 @@ option_list <- list(
     help="Whether to exploit the sparsity of the genotype vector for less frequent variants to speed up the SPA tests or not for binary traits [default=TRUE]."),
   make_option("--SPAcutoff", type="numeric", default=2,
     help=" If the test statistic lies within the standard deviation cutoff of the
-mean, p-value based on traditional score test is returned. Default value is 2."),
+mean, p-value based on traditional score test is returned. Default value is 2."), 
   make_option("--IsOutputAFinCaseCtrl", type="logical",default=FALSE,
     help="whether to output allele frequency in cases and controls for dichotomous traits [default=FALSE]"),
   make_option("--IsOutputNinCaseCtrl", type="logical",default=FALSE,
@@ -111,12 +111,12 @@ mean, p-value based on traditional score test is returned. Default value is 2.")
   make_option("--weightsIncludeinGroupFile", type="logical",default=FALSE,
     help="Whether to specify customized weight for makers in gene- or region-based tests. If TRUE, weights are included in the group file. For vcf/sav, the genetic marker ids and weights are in the format chr:pos_ref/alt;weight. For bgen, the genetic marker ids should match the ids in the bgen filE, e.g. SNPID;weight. Each element in the line is seperated by tab. [default=FALSE]"
 ),
-  make_option("--weights_for_G2_cond",type="character", default=NULL,
+  make_option("--weights_for_G2_cond",type="character", default=NULL, 
     help="vector of float. weights for conditioning markers for gene- or region-based tests. The length equals to the number of conditioning markers, delimited by comma. e.g. '1,2,3"),
   make_option("--IsOutputBETASEinBurdenTest", type="logical",default=FALSE,
     help="Whether to output effect sizes for burden tests. [default=FALSE]"),
   make_option("--IsOutputlogPforSingle", type="logical",default=FALSE,
-    help=" Whether to output log(Pvalue) for single-variant assoc tests. By default, FALSE"),
+    help=" Whether to output log(Pvalue) for single-variant assoc tests. By default, FALSE"),	      
   make_option("--sampleFile_male", type="character",default="",
     help="Path to the file containing one column for IDs of MALE samples in the bgen or vcf file with NO header.Order does not matter"),
   make_option("--X_PARregion", type="character",default="",
@@ -128,7 +128,7 @@ mean, p-value based on traditional score test is returned. Default value is 2.")
   make_option("--MACCutoff_to_CollapseUltraRare", type="numeric", default=10,
     help="MAC cutoff to collpase the ultra rare variants (<= MACCutoff_to_CollapseUltraRare) in the set-based association tests. By default, 10."),
   make_option("--DosageCutoff_for_UltraRarePresence", type="numeric", default=0.5,
-    help="Dosage cutoff to determine whether the ultra rare variants are absent or present in the samples. Dosage >= DosageCutoff_for_UltraRarePresence indicates the varaint in present in the sample. 0< DosageCutoff_for_UltraRarePresence <= 2. By default, 0.5")
+    help="Dosage cutoff to determine whether the ultra rare variants are absent or present in the samples. Dosage >= DosageCutoff_for_UltraRarePresence indicates the varaint in present in the sample. 0< DosageCutoff_for_UltraRarePresence <= 2. By default, 0.5")	      
 )
 
 
@@ -146,7 +146,7 @@ convertoNumeric = function(x,stringOutput){
 	}else{
 		cat(stringOutput, " is ", y, "\n")
 	}
-	return(y)
+	return(y)	
 }
 
 
@@ -176,7 +176,7 @@ SPAGMMATtest(vcfFile=opt$vcfFile,
 	     idstoExcludeFile=opt$idstoExcludeFile,
 	     idstoIncludeFile=opt$idstoIncludeFile,
              rangestoExcludeFile=opt$rangestoExcludeFile,
-             rangestoIncludeFile=opt$rangestoIncludeFile,
+             rangestoIncludeFile=opt$rangestoIncludeFile,  	  
              chrom=opt$chrom,
              start=opt$start,
              end=opt$end,

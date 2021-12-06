@@ -1,7 +1,3 @@
-// datasets = Channel
-//                 .fromPath(params.input)
-//                 .map { file -> tuple(file.baseName, file) }
-
 Channel
 	.fromPath("${params.input}")
 	.splitCsv(header:["datasetID","vcf"], sep:',')
@@ -29,6 +25,7 @@ process vcf_to_plink {
 }
 
 process callrate_and_missing {
+	tag "$datasetID"
 	input:
 	set datasetID,
   file("${datasetID}.bed"),
@@ -51,6 +48,7 @@ geno_mind.into{
 }
 
 process hwe_filter {
+	tag "$datasetID"
 	input:
 	set datasetID,
   file("${datasetID}.par.qc.bed"),
@@ -74,6 +72,7 @@ clean_dataset.into{
 }
 
 process PCA {
+	tag "$datasetID"
 	input:
   set datasetID,
   file("${datasetID}.clean.bed"),
@@ -101,6 +100,7 @@ process PCA {
 }
 
 process convert_to_bgen {
+	tag "$datasetID"
 	input:
 	set datasetID,
 	file("${datasetID}.clean.bed"),
@@ -122,6 +122,7 @@ process convert_to_bgen {
 
 
 process saige_pheno {
+	tag "$datasetID"
 	input:
 	set datasetID,
 	file("${datasetID}.clean.bed"),
@@ -146,35 +147,36 @@ process saige_pheno {
 }
 
 process step1_fitNULLGLMM {
-  conda 'saige.yml'
-	input:
-	set datasetID,
-	file("${datasetID}.clean.bed"),
-	file("${datasetID}.clean.bim"),
-	file("${datasetID}.clean.fam"),
-	file("pheno.txt"),
-	file("sample_file.txt")	from saige_plink_input
-	output:
-	tuple val(datasetID),
-	file("${datasetID}_A2.rda"),
-	file("${datasetID}_A2.varianceRatio.txt"),
-	file("${datasetID}_A2_30markers.SAIGE.results.txt"),
-	file("sample_file.txt")	into step1_output
-	script:
-	"""
-  step1_fitNULLGLMM.R    \\
-    --plinkFile=${datasetID}.clean  \\
-    --phenoFile=pheno.txt \\
-    --phenoCol=A2 \\
-    --covarColList=Age,Age_sq,Sex,Age_sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20 \\
-    --sampleIDColinphenoFile=IID \\
-    --traitType=binary  \\
-    --outputPrefix=${datasetID}_A2 \\
-    --nThreads=20	\\
-  	--LOCO=FALSE  \\
-  	--minMAFforGRM=0.01 \\
-    --IsOverwriteVarianceRatioFile=TRUE
-	"""
+	tag "$datasetID"
+	conda 'saige.yml'
+		input:
+		set datasetID,
+		file("${datasetID}.clean.bed"),
+		file("${datasetID}.clean.bim"),
+		file("${datasetID}.clean.fam"),
+		file("pheno.txt"),
+		file("sample_file.txt")	from saige_plink_input
+		output:
+		tuple val(datasetID),
+		file("${datasetID}_A2.rda"),
+		file("${datasetID}_A2.varianceRatio.txt"),
+		file("${datasetID}_A2_30markers.SAIGE.results.txt"),
+		file("sample_file.txt")	into step1_output
+		script:
+		"""
+		step1_fitNULLGLMM.R    \\
+		--plinkFile=${datasetID}.clean  \\
+		--phenoFile=pheno.txt \\
+		--phenoCol=A2 \\
+		--covarColList=Age,Age_sq,Sex,Age_sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20 \\
+		--sampleIDColinphenoFile=IID \\
+		--traitType=binary  \\
+		--outputPrefix=${datasetID}_A2 \\
+		--nThreads=20	\\
+		--LOCO=FALSE  \\
+		--minMAFforGRM=0.01 \\
+		--IsOverwriteVarianceRatioFile=TRUE
+		"""
 }
 
 
@@ -182,15 +184,16 @@ process step1_fitNULLGLMM {
 bgen.join(step1_output).set{step2_input}
 
 process step2_SPAtests {
+	tag "$datasetID"
   conda 'saige.yml'
-  publishDir "${params.output}/${datasetID}"
+  	publishDir "${params.output}/A2"
 	input:  
 	set datasetID,
 	file("${datasetID}.bgen"),
 	file("${datasetID}.bgen.bgi"),
-	file("${datasetID}.rda"),
-	file("${datasetID}.varianceRatio.txt"),
-	file("${datasetID}_30markers.SAIGE.results.txt"),
+	file("${datasetID}_A2.rda"),
+	file("${datasetID}_A2.varianceRatio.txt"),
+	file("${datasetID}_A2_30markers.SAIGE.results.txt"),
 	file("sample_file.txt")	from step2_input
 	output:
 	tuple val(datasetID),
@@ -199,23 +202,23 @@ process step2_SPAtests {
 	file("${datasetID}_A2_30markers.SAIGE.results.txt") into output
 	script:
 	"""
-  step2_SPAtests.R    \\
-  --bgenFile=${datasetID}.bgen  \\
-  --bgenFileIndex=${datasetID}.bgen.bgi \\
-  --minMAF=0.0001 \\
-  --minMAC=1 \\
-  --sampleFile=sample_file.txt \\
-  --GMMATmodelFile=${datasetID}.rda \\
-  --varianceRatioFile=${datasetID}.varianceRatio.txt \\
-  --SAIGEOutputFile=${datasetID}.SAIGE.bgen.txt \\
-  --numLinesOutput=2 \\
-  --IsOutputNinCaseCtrl=TRUE \\
-  --IsOutputAFinCaseCtrl=TRUE \\
-  --IsOutputHetHomCountsinCaseCtrl=TRUE \\
-  --LOCO=FALSE \\
-  --sampleFile_male=${baseDir}/data/males_id.txt \\
-  --X_PARregion=10001-2781479,155701383-156030895 \\
-  --is_rewrite_XnonPAR_forMales=TRUE
+	step2_SPAtests.R    \\
+	--bgenFile=${datasetID}.bgen  \\
+	--bgenFileIndex=${datasetID}.bgen.bgi \\
+	--minMAF=0.0001 \\
+	--minMAC=1 \\
+	--sampleFile=sample_file.txt \\
+	--GMMATmodelFile=${datasetID}_A2.rda \\
+	--varianceRatioFile=${datasetID}_A2.varianceRatio.txt \\
+	--SAIGEOutputFile=${datasetID}_A2.SAIGE.bgen.txt \\
+	--numLinesOutput=2 \\
+	--IsOutputNinCaseCtrl=TRUE \\
+	--IsOutputAFinCaseCtrl=TRUE \\
+	--IsOutputHetHomCountsinCaseCtrl=TRUE \\
+	--LOCO=FALSE \\
+	--sampleFile_male=${baseDir}/data/males_id.txt \\
+	--X_PARregion=10001-2781479,155701383-156030895 \\
+	--is_rewrite_XnonPAR_forMales=TRUE
 	"""
 }
 
